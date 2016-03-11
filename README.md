@@ -27,9 +27,22 @@ This program also uses software which has no clear licensing information (wx).
 ###LICENSE 
 General Public License version 2.0, or any later version
 
-###dotpredict-predict.tle
-Modification of PREDICT's TLE file to provide orbit data for weather satellites NOAA-15, NOAA-18, NOAA-19
-to get coverage of missing satellites into predict's default config. Please edit qth to reflect your station position.
+###BASIC usage info
+You'll need to install predict and wxtoimg packages. For installing predict please follow your distro instructions: for example in Debian:
+```
+sudo apt-get install predict
+```
+or in openSuSE:
+```
+sudo zypper in predict
+```
+or use package manager provided with your distro.
+As for wxtoimg I strongly recomment grabbing .tar.gz package and unpacking it to your /usr/local/ dir. Packages are provided on wxtoimg website.
+
+Next step is to dry-run predict - it should create files which you'll need to replace, edit location info (used in wxmap), and run update-kepplers.sh. More info below.
+
+###predict TLEs
+These are in tles/ folder - modification of PREDICT's files to provide orbit data for weather satellites NOAA-15, NOAA-18, NOAA-19 to get coverage of missing satellites into predict's default config. Please edit qth to reflect your station position.
 Example values are provided.
     
 Copy as follows:  
@@ -39,8 +52,12 @@ cp tles/predict.tle ~/.predict/predict.tle
 cp tles/predict.db ~/.predict/predict.db
 
 ```
+edit qth:
+```
+nano ~/.predict/predict.qth
+```
+or run predict, press G to change Ground Station Location.
 
-    
 ###noaacapture.py
 This is the main python script.  It will calculate the time
 of the next pass for recording.  It expects to call rtl_fm to do the
