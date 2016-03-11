@@ -1,0 +1,85 @@
+NOAA-15
+25338
+No alat, alon
+APT Downlink
+0.0, 0.0
+137.620, 137.620
+No weekly schedule
+No orbital schedule
+HRPT Downlink
+0.0, 0.0
+1702.5, 1702.5
+No weekly schedule
+No orbital schedule
+end
+NOAA-18
+28654
+No alat, alon
+APT Downlink
+0.0, 0.0
+137.912, 137.912
+No weekly schedule
+No orbital schedule
+HRPT Downlink
+0.0, 0.0
+1707.0, 1707.0
+No weekly schedule
+No orbital schedule
+end
+NOAA-19
+33591
+No alat, alon
+APT Downlink
+0.0, 0.0
+137.100, 137.100
+No weekly schedule
+No orbital schedule
+HRPT Downlink
+0.0, 0.0
+1698.0, 1698.0
+No weekly schedule
+No orbital schedule
+end
+ISS
+25544
+No alat, alon
+ARISS VHF Packet Radio Mailbox
+145.990, 145.990
+145.800, 145.800
+No weekly schedule
+No orbital schedule
+Region 2/3 ARISS VHF-FM Voice
+144.490, 144.490
+145.800, 145.800
+No weekly schedule
+No orbital schedule
+Region 1 ARISS VHF-FM Voice
+145.200, 145.200
+145.800, 145.800
+No weekly schedule
+No orbital schedule
+ARISS UHF-FM Voice
+437.500, 437.500
+437.500, 437.500
+No weekly schedule
+No orbital schedule
+Crossband Repeater
+437.800, 437.800
+145.800, 145.800
+No weekly schedule
+No orbital schedule
+TsUP FM Voice Downlink
+0.0, 0.0
+143.625, 143.625
+No weekly schedule
+No orbital schedule
+end
+PCSAT
+26931
+No alat, alon
+1200 baud AFSK APRS Digipeater (PCSAT-1)
+145.827, 145.827
+145.827, 145.827
+No weekly schedule
+No orbital schedule
+end
