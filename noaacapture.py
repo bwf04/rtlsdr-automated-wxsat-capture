@@ -29,7 +29,9 @@ stationLon='53.3404'
 stationLat='-15.0579'
 stationAlt='20'
 #
-# Directories used in wx
+# Directories used in this program
+# wxtoimg install dir
+wxInstallDir='/usr/local/bin'
 # Recording dir, used for RAW and WAV files
 #
 recdir='/opt/wxsat/rec'
@@ -44,6 +46,8 @@ imgdir='/opt/wxsat/img'
 
 # Options for wxtoimg / aptdec
 # None actually right now, this will hopefully change in upcoming release
+wxEnhHVC='yes'
+wxEnhHVCT='yes'
 
 # Various options
 # Should this script create spectrogram : yes/no
@@ -92,8 +96,14 @@ def doppler(fname,emergeTime):
     subprocess.call(cmdline)
 
 def decode(fname):
-    cmdline = ['/usr/local/bin/wxtoimg','-A',recdir+'/'+fname+'.wav', imgdir+'/'+fname+'.jpg']
+    cmdline = [ wxInstallDir+'/wxtoimg','-A',recdir+'/'+fname+'.wav', imgdir+'/'+fname+'-normal.jpg']
     subprocess.call(cmdline)
+    if wxEnhHVC in ('yes', 'y', '1'):
+	cmdline_hvc = [ wxInstallDir+'/wxtoimg','-A','-e','HVC',recdir+'/'+fname+'.wav', imgdir+'/'+fname+'-hvc.jpg']
+	subprocess.call(cmdline_hvc)
+    if wxEnhHVCT in ('yes', 'y', '1'):
+	cmdline_hvct = [ wxInstallDir+'/wxtoimg','-A','-e','HVCT',recdir+'/'+fname+'.wav', imgdir+'/'+fname+'-hvct.jpg']
+	subprocess.call(cmdline_hvct)
 
 def recordWAV(freq,fname,duration):
     recordFM(freq,fname,duration,xfname)
