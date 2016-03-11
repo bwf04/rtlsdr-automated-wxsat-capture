@@ -49,28 +49,47 @@ recording and sox to convert the file to .wav. It can create spectrogram of the 
 
 A few words about the options.
 
+
 satellites - this is a list of satellites you want to capture, this needs to be the same name as in TLE file
+
 freqs - frequencies of centre of the APT signal
 
+
 dongleGain - set this to the desired gain of the dongle, leave "0" if you want AGC
+
 dongleShift - set this to the dongle PPM shift, can be negative
+
 dongleIndex - set this to the index of your dongle, of you have only one - leave it unchanged.
+
 sample - "sample rate", option "-s" for rtl_fm - this is the width of the recorded signal. Please keep in mind that APT is 34kHz but you should include few kHz for doppler shift. This will change when the doppler tool is used.
+
 wavrate - sample rate of the WAV file used to generate JPEGs. Should be 11025.
 
+
 Station options for doppler tool (not used right now).
+
 stationLat - latitude of the station in degrees NORTH, negative value for SOUTH
+
 stationLon - longtitude of the station in degress WEST, negative for EAST
+
 stationAlt - your altitude above sea level (in metres) 
 
+
 Directories: directories used for misc. files
+
 recdir - this is a directory containing RAW and WAV files
+
 specdir - this is a directory holding spectrogram files created from the pass (PNG)
+
 imgdir - output JPG images
 
+
 Misc options, not all are used right now
+
 createSpectro - should program create spectrogram files for the pass? Useful for debugging images. Possible values are "yes", "y" and "1" for YES, any other value will not create spectro.
+
 runDoppler - should we do the doppler shift using "doppler" tool? Not needed for wxtoimg as it seems it does the correction itself.
+
 
 ###pypredict.py
 This is a short python module for extracting the AOS/LOS times
