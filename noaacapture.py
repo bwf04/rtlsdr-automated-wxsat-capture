@@ -46,8 +46,8 @@ imgdir='/opt/wxsat/img'
 
 # Options for wxtoimg / aptdec
 # None actually right now, this will hopefully change in upcoming release
-wxEnhHVC='yes'
-wxEnhHVCT='yes'
+wxEnhHVC='no'
+wxEnhHVCT='no'
 
 # Various options
 # Should this script create spectrogram : yes/no
