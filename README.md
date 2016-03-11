@@ -44,16 +44,15 @@ cp tles/predict.db ~/.predict/predict.db
 ###noaacapture.py
 This is the main python script.  It will calculate the time
 of the next pass for recording.  It expects to call rtl_fm to do the
-recording and sox to convert the file to .wav. It can create spectrogram of the pass using sox (not the RTL_POWER!)
+recording and sox to convert the file to .wav. It can create spectrogram of the pass using sox (not the RTL_POWER!).
 
 
 ####A few words about the options.
 
-* satellites - this is a list of satellites you want to capture, this needs to be the same name as in TLE file
-* freqs - frequencies of centre of the APT signal
-
-* dongleGain - set this to the desired gain of the dongle, leave "0" if you want AGC
-* dongleShift - set this to the dongle PPM shift, can be negative
+* satellites - this is a list of satellites you want to capture, this needs to be the same name as in TLE file.
+* freqs - frequencies of centre of the APT signal.
+* dongleGain - set this to the desired gain of the dongle, leave "0" if you want AGC.
+* dongleShift - set this to the dongle PPM shift, can be negative.
 * dongleIndex - set this to the index of your dongle, of you have only one - leave it unchanged.
 * sample - "sample rate", option "-s" for rtl_fm - this is the width of the recorded signal. Please keep in mind that APT is 34kHz but you should include few kHz for doppler shift. This will change when the doppler tool is used.
 * wavrate - sample rate of the WAV file used to generate JPEGs. Should be 11025.
