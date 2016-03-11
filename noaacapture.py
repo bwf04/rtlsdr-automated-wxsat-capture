@@ -80,6 +80,7 @@ def recordFM(freq, fname, duration, xfname):
     runForDuration(cmdline, duration)
 
 def transcode(fname):
+    print 'Transcoding...'
     cmdline = ['sox','-t','raw','-r',sample,'-es','-b','16','-c','1','-V1',recdir+'/'+fname+'.raw',recdir+'/'+fname+'.wav','rate',wavrate]
     subprocess.call(cmdline)
 
@@ -96,12 +97,15 @@ def doppler(fname,emergeTime):
     subprocess.call(cmdline)
 
 def decode(fname):
+    print 'Creating basic image'
     cmdline = [ wxInstallDir+'/wxtoimg','-A',recdir+'/'+fname+'.wav', imgdir+'/'+fname+'-normal.jpg']
     subprocess.call(cmdline)
     if wxEnhHVC in ('yes', 'y', '1'):
+	print 'Creating HVC image'
 	cmdline_hvc = [ wxInstallDir+'/wxtoimg','-A','-e','HVC',recdir+'/'+fname+'.wav', imgdir+'/'+fname+'-hvc.jpg']
 	subprocess.call(cmdline_hvc)
     if wxEnhHVCT in ('yes', 'y', '1'):
+	print 'Creating HVCT image'
 	cmdline_hvct = [ wxInstallDir+'/wxtoimg','-A','-e','HVCT',recdir+'/'+fname+'.wav', imgdir+'/'+fname+'-hvct.jpg']
 	subprocess.call(cmdline_hvct)
 
@@ -114,6 +118,7 @@ def recordWAV(freq,fname,duration):
 def spectrum(fname):
     # Changed spectrum generation, now it creates spectrogram from recorded WAV file
     # Optional
+    print 'Creating flight spectrum'
     cmdline = ['sox',recdir+'/'+fname+'.wav', '-n', 'spectrogram','-o',specdir+'/'+fname+'.png']
     subprocess.call(cmdline)
 
@@ -144,12 +149,12 @@ while True:
     # Go on, for now we'll name recordings and images by Unix timestamp.
     fname=str(aosTime)
     xfname=satName
-    print "Beginning pass of "+satname+". Predicted start "+aosTimeCnv+" and end "+losTimeCnv+". Will record for "+str(recordTime).split(".")[0]+" seconds."
+    print "Beginning pass of "+satName+". Predicted start "+aosTimeCnv+" and end "+losTimeCnv+". Will record for "+str(recordTime).split(".")[0]+" seconds."
     recordWAV(freq,fname,recordTime)
     print "Decoding image"
     decode(fname) # make picture
     # spectrum(fname,losTime-aosTime)
-    print "Finished pass of "+satname+" at "+losTimeCnv+". Sleeping for 60 seconds"
+    print "Finished pass of "+satName+" at "+losTimeCnv+". Sleeping for 60 seconds"
     # Is this really needed?
     time.sleep(60.0)
 
