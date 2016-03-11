@@ -126,7 +126,6 @@ while True:
     if towait>0:
         print "waiting "+str(towait).split(".")[0]+" seconds (emerging "+aosTimeCnv+") for "+satName
         time.sleep(towait)
-
     # If the script broke and sat is passing by - change record time to reflect time change
     if aosTime<now:
 	recordTime=losTime-now
@@ -140,7 +139,7 @@ while True:
     print "Decoding image"
     decode(fname) # make picture
     # spectrum(fname,losTime-aosTime)
-    print "Finished pass of "+satName+" at "+losTimeCnv+". Sleeping for 60 seconds"
+    print "Finished pass of "+satname+" at "+losTimeCnv+". Sleeping for 60 seconds"
     # Is this really needed?
     time.sleep(60.0)
 
