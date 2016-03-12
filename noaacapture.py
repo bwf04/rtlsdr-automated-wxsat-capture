@@ -117,7 +117,7 @@ def createoverlay(fname,aosTime,satName):
 def decode(fname,aosTime,satName):
     if wxAddOverlay in ('yes', 'y', '1'):
 	print 'Creating basic image with overlay'
-	#createoverlay(fname,aosTime,satName)
+	createoverlay(fname,aosTime,satName)
 	cmdline = [ wxInstallDir+'/wxtoimg','-A','-m', mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+fname+'-normal.jpg']
 	print cmdline
 	subprocess.call(cmdline)
@@ -127,7 +127,7 @@ def decode(fname,aosTime,satName):
 	    subprocess.call(cmdline_hvc)
 	if wxEnhHVCT in ('yes', 'y', '1'):
 	    print 'Creating HVCT image'
-	    cmdline_hvct = [ wxInstallDir+'/wxtoimg','-A','-e','HVCT',mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+fname+'-hvct.jpg']
+	    cmdline_hvct = [ wxInstallDir+'/wxtoimg','-A','-e','HVCT','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+fname+'-hvct.jpg']
 	    subprocess.call(cmdline_hvct)
     else:
 	print 'Creating basic image without map'
