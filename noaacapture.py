@@ -109,7 +109,7 @@ def createoverlay(fname,aosTime,satName):
     '-G',stationFileDir+'/.predict/',\
     '-H','predict.tle',\
     '-M','0',\
-    '-L',stationLat+'/'+stationLon+'/'+stationAlt,\
+    '-L',stationLat+'/'+float(stationLon)*-1+'/'+stationAlt,\
     str(aosTime), mapDir+'/'+str(fname)+'-map.png']
     print cmdline
     subprocess.call(cmdline)
