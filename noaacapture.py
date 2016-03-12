@@ -62,6 +62,8 @@ stationLon=str(stationData[2]).rstrip().strip()
 stationAlt=str(stationData[3]).rstrip().strip()
 stationFile.close()
 
+stationLonNeg=float(stationLon)*-1
+
 
 def runForDuration(cmdline, duration):
     try:
@@ -109,7 +111,7 @@ def createoverlay(fname,aosTime,satName):
     '-G',stationFileDir+'/.predict/',\
     '-H','predict.tle',\
     '-M','0',\
-    '-L',stationLat+'/'+float(stationLon)*-1+'/'+stationAlt,\
+    '-L',stationLat+'/'+str(stationLonNeg)+'/'+stationAlt,\
     str(aosTime), mapDir+'/'+str(fname)+'-map.png']
     print cmdline
     subprocess.call(cmdline)
