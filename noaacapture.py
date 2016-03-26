@@ -164,10 +164,10 @@ def decode(fname,aosTime,satName):
 	    print 'Creating MSA image'
 	    cmdline_msa = [ wxInstallDir+'/wxtoimg','-A','-e','MSA',recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-msa.jpg']
 	    subprocess.call(cmdline_msa)
-	if wxEnhMSIR in ('yes', 'y', '1'):
-	    print 'Creating MSIR image'
-	    cmdline_msir = [ wxInstallDir+'/wxtoimg','-A','-e','MCIR',recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-msir.jpg']
-	    subprocess.call(cmdline_msir)
+	if wxEnhMCIR in ('yes', 'y', '1'):
+	    print 'Creating MCIR image'
+	    cmdline_mcir = [ wxInstallDir+'/wxtoimg','-A','-e','MCIR',recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-msir.jpg']
+	    subprocess.call(cmdline_mcir)
 
 def recordWAV(freq,fname,duration):
     recordFM(freq,fname,duration,xfname)
