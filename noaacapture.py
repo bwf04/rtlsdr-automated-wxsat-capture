@@ -1,4 +1,5 @@
 import time
+import datetime
 from time import gmtime, strftime
 import pypredict
 import subprocess
@@ -128,44 +129,44 @@ def decode(fname,aosTime,satName):
     if wxAddOverlay in ('yes', 'y', '1'):
 	print 'Creating basic image with overlay'
 	createoverlay(fname,aosTime,satName)
-	cmdline = [ wxInstallDir+'/wxtoimg','-A','-m', mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+satname+'/'+fname+'-normal.jpg']
+	cmdline = [ wxInstallDir+'/wxtoimg','-A','-m', mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+satName+'/'+fname+'-normal.jpg']
 	print cmdline
 	subprocess.call(cmdline)
 	if wxEnhHVC in ('yes', 'y', '1'):
 	    print 'Creating HVC image'
-	    cmdline_hvc = [ wxInstallDir+'/wxtoimg','-A','-e','HVC','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav', imgdir+'/'+satname+'/'+fname+'-hvc.jpg']
+	    cmdline_hvc = [ wxInstallDir+'/wxtoimg','-A','-e','HVC','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fname+'-hvc.jpg']
 	    subprocess.call(cmdline_hvc)
 	if wxEnhHVCT in ('yes', 'y', '1'):
 	    print 'Creating HVCT image'
-	    cmdline_hvct = [ wxInstallDir+'/wxtoimg','-A','-e','HVCT','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+satname+'/'+fname+'-hvct.jpg']
+	    cmdline_hvct = [ wxInstallDir+'/wxtoimg','-A','-e','HVCT','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+satName+'/'+fname+'-hvct.jpg']
 	    subprocess.call(cmdline_hvct)
 	if wxEnhMSA in ('yes', 'y', '1'):
 	    print 'Creating MSA image'
-	    cmdline_msa = [ wxInstallDir+'/wxtoimg','-A','-e','MSA','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+satname+'/'+fname+'-msa.jpg']
+	    cmdline_msa = [ wxInstallDir+'/wxtoimg','-A','-e','MSA','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+satName+'/'+fname+'-msa.jpg']
 	    subprocess.call(cmdline_msa)
 	if wxEnhMCIR in ('yes', 'y', '1'):
 	    print 'Creating MCIR image'
-	    cmdline_mcir = [ wxInstallDir+'/wxtoimg','-A','-e','MCIR','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+satname+'/'+fname+'-mcir.jpg']
+	    cmdline_mcir = [ wxInstallDir+'/wxtoimg','-A','-e','MCIR','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+satName+'/'+fname+'-mcir.jpg']
 	    subprocess.call(cmdline_mcir)
     else:
 	print 'Creating basic image without map'
-	cmdline = [ wxInstallDir+'/wxtoimg','-A',recdir+'/'+fname+'.wav', imgdir+'/'+satname+'/'+fileNameC+'-normal.jpg']
+	cmdline = [ wxInstallDir+'/wxtoimg','-A',recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg']
 	subprocess.call(cmdline)
 	if wxEnhHVC in ('yes', 'y', '1'):
 	    print 'Creating HVC image'
-	    cmdline_hvc = [ wxInstallDir+'/wxtoimg','-A','-e','HVC',recdir+'/'+fname+'.wav', imgdir+'/'+satname+'/'+fileNameC+'-hvc.jpg']
+	    cmdline_hvc = [ wxInstallDir+'/wxtoimg','-A','-e','HVC',recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvc.jpg']
 	    subprocess.call(cmdline_hvc)
 	if wxEnhHVCT in ('yes', 'y', '1'):
 	    print 'Creating HVCT image'
-	    cmdline_hvct = [ wxInstallDir+'/wxtoimg','-A','-e','HVCT',recdir+'/'+fname+'.wav', imgdir+'/'+satname+'/'+fileNameC+'-hvct.jpg']
+	    cmdline_hvct = [ wxInstallDir+'/wxtoimg','-A','-e','HVCT',recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvct.jpg']
 	    subprocess.call(cmdline_hvct)
 	if wxEnhMSA in ('yes', 'y', '1'):
 	    print 'Creating MSA image'
-	    cmdline_msa = [ wxInstallDir+'/wxtoimg','-A','-e','MSA',recdir+'/'+fname+'.wav', imgdir+'/'+satname+'/'+fileNameC+'-msa.jpg']
+	    cmdline_msa = [ wxInstallDir+'/wxtoimg','-A','-e','MSA',recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-msa.jpg']
 	    subprocess.call(cmdline_msa)
 	if wxEnhMSIR in ('yes', 'y', '1'):
 	    print 'Creating MSIR image'
-	    cmdline_msir = [ wxInstallDir+'/wxtoimg','-A','-e','MCIR',recdir+'/'+fname+'.wav', imgdir+'/'+satname+'/'+fileNameC+'-msir.jpg']
+	    cmdline_msir = [ wxInstallDir+'/wxtoimg','-A','-e','MCIR',recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-msir.jpg']
 	    subprocess.call(cmdline_msir)
 
 def recordWAV(freq,fname,duration):
