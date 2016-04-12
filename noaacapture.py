@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import time
 import datetime
 from time import gmtime, strftime
@@ -18,11 +19,12 @@ dongleShift='52'
 dongleIndex='0'
 #
 # Sample rate, width of recorded signal - should include few kHz for doppler shift
-sample ='41000'
+sample ='48000'
+sampleMeteor='200000'
 # Sample rate of the wav file. Shouldn't be changed
 wavrate='11025'
 #
-# Should I remove RAWs?
+# Should I remove RAWs after transcoding?
 removeRAW='yes'
 # Directories used in this program
 # wxtoimg install dir
@@ -47,9 +49,9 @@ mapDir='/opt/wxsat/maps'
 wxAddOverlay='no'
 # Image outputs
 wxEnhHVC='no'
-wxEnhHVCT='yes'
+wxEnhHVCT='no'
 wxEnhMSA='no'
-wxEnhMCIR='yes'
+wxEnhMCIR='no'
 # Other tunables
 wxQuietOutput='no'
 wxDecodeAll='yes'
@@ -103,7 +105,7 @@ def runForDuration(cmdline, duration):
         print "OS Error: "+e.strerror
 
 def recordFM(freq, fname, duration, xfname):
-
+    xfNoSpace=xfname.replace(" ","")
     cmdline = ['rtl_fm',\
 		'-f',str(freq),\
 		'-s',sample,\
@@ -113,16 +115,52 @@ def recordFM(freq, fname, duration, xfname):
 		'-E','dc',\
 		'-E','offset',\
 		'-p',dongleShift,\
-		recdir+'/'+fname+'.raw' ]
+		recdir+'/'+xfNoSpace+'-'+fname+'.raw' ]
+
+    runForDuration(cmdline, duration)
+
+def recordDOP(freq, fname, duration, xfname):
+    xfNoSpace=xfname.replace(" ","")
+
+    cmdline = ['iqrecord.sh', \
+	'-f', str(freq), \
+	'-s', str('1024000'), \
+	'-g', dongleGain, \
+	'-p', dongleShift, \
+#	'-m', stationFileDir+'/.predict/predict.tle', \
+	'-m', '/tmp/weather.txt', \
+	'-r', xfname, \
+	'-T', stationLat, \
+	'-L', str(stationLonNeg), \
+	'-A', stationAlt, \
+	'-d', wavrate, \
+	'-z', recdir+'/'+xfNoSpace+'-'+fname+'.wav']
+
+    runForDuration(cmdline, duration)
+
+def recordMETEOR(freq, fname, duration, xfname):
+    xfNoSpace=xfname.replace(" ","")
+    cmdline = ['rtl_fm',\
+		'-f',str(freq),\
+		'-s',sampleMeteor,\
+		'-g',dongleGain,\
+		'-F','9',\
+		'-A','fast',\
+		'-E','dc',\
+		'-E','offset',\
+		'-p',dongleShift,\
+		recdir+'/'+xfNoSpace+'-'+fname+'.raw' ]
 
     runForDuration(cmdline, duration)
 
 def transcode(fname):
+    xfNoSpace=xfname.replace(" ","")
     print 'Transcoding...'
-    cmdline = ['sox','-t','raw','-r',sample,'-es','-b','16','-c','1','-V1',recdir+'/'+fname+'.raw',recdir+'/'+fname+'.wav','rate',wavrate]
+    cmdline = ['sox','-t','raw','-r',sample,'-es','-b','16','-c','1','-V1',recdir+'/'+xfNoSpace+'-'+fname+'.raw',recdir+'/'+xfNoSpace+'-'+fname+'.wav','rate',wavrate]
     subprocess.call(cmdline)
     if removeRAW in ('yes', 'y', '1'):
-	os.remove(recdir+'/'+fname+'.raw')
+	print 'Removing RAW data'
+	os.remove(recdir+'/'+xfNoSpace+'-'+fname+'.raw')
 
 def doppler(fname,emergeTime):
     cmdline = ['doppler', 
@@ -148,62 +186,71 @@ def createoverlay(fname,aosTime,satName):
     subprocess.call(cmdline)
 
 def decode(fname,aosTime,satName):
+    xfNoSpace=xfname.replace(" ","")
     satTimestamp = int(fname)
     fileNameC = datetime.datetime.fromtimestamp(satTimestamp).strftime('%Y%m%d-%H%M')
     if wxAddOverlay in ('yes', 'y', '1'):
 	print 'Creating basic image with overlay'
 	createoverlay(fname,aosTime,satName)
-	cmdline = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-m', mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg']
+	cmdline = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg']
 	print cmdline
 	subprocess.call(cmdline)
 	if wxEnhHVC in ('yes', 'y', '1'):
 	    print 'Creating HVC image'
-	    cmdline_hvc = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','HVC','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvc.jpg']
+	    cmdline_hvc = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','HVC','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvc.jpg']
 	    subprocess.call(cmdline_hvc)
 	if wxEnhHVCT in ('yes', 'y', '1'):
 	    print 'Creating HVCT image'
-	    cmdline_hvct = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','HVCT','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-hvct.jpg']
+	    cmdline_hvct = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','HVCT','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-hvct.jpg']
 	    subprocess.call(cmdline_hvct)
 	if wxEnhMSA in ('yes', 'y', '1'):
 	    print 'Creating MSA image'
-	    cmdline_msa = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MSA','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-msa.jpg']
+	    cmdline_msa = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MSA','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-msa.jpg']
 	    subprocess.call(cmdline_msa)
 	if wxEnhMCIR in ('yes', 'y', '1'):
 	    print 'Creating MCIR image'
-	    cmdline_mcir = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MCIR','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-mcir.jpg']
+	    cmdline_mcir = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MCIR','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-mcir.jpg']
 	    subprocess.call(cmdline_mcir)
     else:
 	print 'Creating basic image without map'
-	cmdline = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg']
+	cmdline = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg']
 	subprocess.call(cmdline)
 	if wxEnhHVC in ('yes', 'y', '1'):
 	    print 'Creating HVC image'
-	    cmdline_hvc = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','HVC',recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvc.jpg']
+	    cmdline_hvc = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','HVC',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvc.jpg']
 	    subprocess.call(cmdline_hvc)
 	if wxEnhHVCT in ('yes', 'y', '1'):
 	    print 'Creating HVCT image'
-	    cmdline_hvct = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','HVCT',recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvct.jpg']
+	    cmdline_hvct = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','HVCT',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvct.jpg']
 	    subprocess.call(cmdline_hvct)
 	if wxEnhMSA in ('yes', 'y', '1'):
 	    print 'Creating MSA image'
-	    cmdline_msa = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MSA',recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-msa.jpg']
+	    cmdline_msa = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MSA',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-msa.jpg']
 	    subprocess.call(cmdline_msa)
 	if wxEnhMCIR in ('yes', 'y', '1'):
 	    print 'Creating MCIR image'
-	    cmdline_mcir = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MCIR',recdir+'/'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-mcir.jpg']
+	    cmdline_mcir = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MCIR',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-mcir.jpg']
 	    subprocess.call(cmdline_mcir)
 
-def recordWAV(freq,fname,duration):
-    recordFM(freq,fname,duration,xfname)
-    transcode(fname)
-    if createSpectro in ('yes', 'y', '1'):
-	spectrum(fname)
+def recordWAV(freq,fname,duration,xfname):
+    #print xfname
+    if xfname in ('NOAA 15', 'NOAA 19', 'NOAA 18'):
+	recordFM(freq,fname,duration,xfname)
+#	recordDOP(freq,fname,duration,xfname)
+	transcode(fname)
+	if createSpectro in ('yes', 'y', '1'):
+	    spectrum(fname)
+    elif xfname in ('METEOR-M2'):
+	recordMETEOR(freq,fname,duration,xfname)
+	if createSpectro in ('yes', 'y', '1'):
+	    spectrum(fname)
 
 def spectrum(fname):
+    xfNoSpace=xfname.replace(" ","")
     # Changed spectrum generation, now it creates spectrogram from recorded WAV file
     # Optional
     print 'Creating flight spectrum'
-    cmdline = ['sox',recdir+'/'+fname+'.wav', '-n', 'spectrogram','-o',specdir+'/'+fname+'.png']
+    cmdline = ['sox',recdir+'/'+xfNoSpace+'-'+fname+'.wav', '-n', 'spectrogram','-o',specdir+'/'+xfNoSpace+'-'+fname+'.png']
     subprocess.call(cmdline)
 
 def findNextPass():
@@ -234,9 +281,11 @@ while True:
     fname=str(aosTime)
     xfname=satName
     print "Beginning pass of "+satName+". Predicted start "+aosTimeCnv+" and end "+losTimeCnv+". Will record for "+str(recordTime).split(".")[0]+" seconds."
-    recordWAV(freq,fname,recordTime)
-    print "Decoding image"
-    decode(fname,aosTime,satName) # make picture
+    recordWAV(freq,fname,recordTime,xfname)
+    #recordDOP(freq,fname,recordTime,xfname)
+    print "Decoding data"
+    if xfname in ('NOAA 15', 'NOAA 19', 'NOAA 18'):
+	decode(fname,aosTime,satName) # make picture
     print "Finished pass of "+satName+" at "+losTimeCnv+". Sleeping for 10 seconds"
     # Is this really needed?
     time.sleep(10.0)
