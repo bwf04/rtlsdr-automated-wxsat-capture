@@ -19,7 +19,7 @@ dongleShift='52'
 dongleIndex='0'
 #
 # Sample rate, width of recorded signal - should include few kHz for doppler shift
-sample ='48000'
+sample ='44100'
 sampleMeteor='200000'
 # Sample rate of the wav file. Shouldn't be changed
 wavrate='11025'
@@ -153,14 +153,14 @@ def recordMETEOR(freq, fname, duration, xfname):
 
     runForDuration(cmdline, duration)
 
-def writeStatus(freq, aosTime, losTime, recordTime, xfName, status):
+def writeStatus(freq, aosTime, losTime, losTimeUnix, recordTime, xfName, status):
     statFile=open('/tmp/rec_info', 'r+')
     if status in ('RECORDING'):
-	statFile.write('F: '+str(freq)+' | '+str(xfName)+' | '+'AOS.'+str(aosTime)+' | \n'+str(status)+' FOR '+str(recordTime)+' SECS | LOS.'+str(losTime)+'\n')
+	statFile.write(str(xfName)+' | '+'AOS.'+str(aosTime)+'REC:'+str(recordTime)+'s | LOS.'+str(losTime)+'\nR\n'+str(losTimeUnix)+'\n')
     elif status in ('DECODING'):
-	statFile.write('FINISHED PASS OF '+str(xfName)+' AT '+str(losTime)+'\n'+'DECODING IMAGE'+'\n')
+	statFile.write('FINISHED PASS OF '+str(xfName)+' AT '+str(losTime)+'\n'+'DECODING IMAGE'+'\n'+str(losTimeUnix)+'\n')
     elif status in ('WAITING'):
-	statFile.write('WAITING FOR '+str(xfName)+' (AOS.'+str(aosTime)+') \nIDLE\n')
+	statFile.write('NXT: '+str(xfName)+' (AOS.'+str(aosTime)+') \nW\n'+str(losTimeUnix)+'\n')
     statFile.close
 
 
@@ -282,23 +282,27 @@ while True:
     dimTimeUtc=strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(losTime))
     if towait>0:
         print "waiting "+str(towait).split(".")[0]+" seconds (emerging "+aosTimeCnv+") for "+satName
-        writeStatus(freq,aosTimeCnv,losTimeCnv,towait,satName,'WAITING')
+        writeStatus(freq,aosTimeCnv,losTimeCnv,aosTime,towait,satName,'WAITING')
     	time.sleep(towait)
     # If the script broke and sat is passing by - change record time to reflect time change
     if aosTime<now:
 	recordTime=losTime-now
+        if recordTime<1:
+	    recordTime=1
     elif aosTime>=now:
 	recordTime=losTime-aosTime
+        if recordTime<1:
+	    recordTime=1
     # Go on, for now we'll name recordings and images by Unix timestamp.
     fname=str(aosTime)
     xfname=satName
     print "Beginning pass of "+satName+". Predicted start "+aosTimeCnv+" and end "+losTimeCnv+". Will record for "+str(recordTime).split(".")[0]+" seconds."
-    writeStatus(freq,aosTimeCnv,losTimeCnv,str(recordTime).split(".")[0],satName,'RECORDING')
+    writeStatus(freq,aosTimeCnv,losTimeCnv,str(losTime),str(recordTime).split(".")[0],satName,'RECORDING')
     recordWAV(freq,fname,recordTime,xfname)
     #recordDOP(freq,fname,recordTime,xfname)
     print "Decoding data"
     if xfname in ('NOAA 15', 'NOAA 19', 'NOAA 18'):
-	writeStatus(freq,aosTimeCnv,losTimeCnv,str(recordTime).split(".")[0],satName,'DECODING')
+	writeStatus(freq,aosTimeCnv,losTimeCnv,str(losTime),str(recordTime).split(".")[0],satName,'DECODING')
 	decode(fname,aosTime,satName) # make picture
     print "Finished pass of "+satName+" at "+losTimeCnv+". Sleeping for 10 seconds"
     # Is this really needed?
