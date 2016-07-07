@@ -17,6 +17,8 @@ def aoslos(satname):
         losTime=int(lines[-2].split()[0])
         if losTime>aosTime:
             return (aosTime,losTime)
+	elif losTime==aosTime:
+	    return (aosTime,losTime)
     except Exception:
         pass
     raise missingSatellitePredictionError()
