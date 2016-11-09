@@ -12,13 +12,19 @@ class missingSatellitePredictionError(Exception):
     
 def aoslos(satname):
     lines = subprocess.check_output(['predict','-p',satname]).split("\n")
+    result = []
+    for line in lines:
+	data = line.split()
+	if len(data)==12:  # expect 12 columns, pick out time, lat, lon
+	    result.extend([int(data[j]) for j in [4]])
+    maxElev=max(result)
     try:
         aosTime=int(lines[0].split()[0])
         losTime=int(lines[-2].split()[0])
         if losTime>aosTime:
-            return (aosTime,losTime)
+            return (aosTime,losTime,maxElev)
 	elif losTime==aosTime:
-	    return (aosTime,losTime)
+	    return (aosTime,losTime,maxElev)
     except Exception:
         pass
     raise missingSatellitePredictionError()

@@ -10,10 +10,10 @@ import os
 satellites = ['NOAA 18','NOAA 15','NOAA 19']
 freqs = [137912500, 137620000, 137100000]
 # Dongle gain
-dongleGain='50'
+dongleGain='46'
 #
 # Dongle PPM shift, hopefully this will change to reflect different PPM on freq
-dongleShift='52'
+dongleShift='53'
 #
 # Dongle index, is there any rtl_fm allowing passing serial of dongle? Unused right now
 dongleIndex='0'
@@ -65,7 +65,8 @@ wxOverlayText='text'
 createSpectro='yes'
 # Use doppler shift for correction, not used right now - leave as is
 runDoppler='no'
-
+#
+minElev='5'
 # Read qth file for station data
 stationFileDir=os.path.expanduser('~')
 stationFilex=stationFileDir+'/.predict/predict.qth'
@@ -224,7 +225,7 @@ def decode(fname,aosTime,satName):
 	    subprocess.call(cmdline_mcir)
     else:
 	print 'Creating basic image without map'
-	cmdline = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg']
+	cmdline = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-t','NOAA',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg']
 	subprocess.call(cmdline)
 	if wxEnhHVC in ('yes', 'y', '1'):
 	    print 'Creating HVC image'
@@ -273,7 +274,7 @@ def findNextPass():
             predictions[nextIndex]) 
 
 while True:
-    (satName, freq, (aosTime, losTime)) = findNextPass()
+    (satName, freq, (aosTime, losTime,maxElev)) = findNextPass()
     now = time.time()
     towait = aosTime-now
     aosTimeCnv=strftime('%H:%M:%S', time.localtime(aosTime))
@@ -284,27 +285,33 @@ while True:
         print "waiting "+str(towait).split(".")[0]+" seconds (emerging "+aosTimeCnv+") for "+satName
         writeStatus(freq,aosTimeCnv,losTimeCnv,aosTime,towait,satName,'WAITING')
     	time.sleep(towait)
-    # If the script broke and sat is passing by - change record time to reflect time change
+	# If the script broke and sat is passing by - change record time to reflect time change
     if aosTime<now:
-	recordTime=losTime-now
+        recordTime=losTime-now
         if recordTime<1:
 	    recordTime=1
     elif aosTime>=now:
 	recordTime=losTime-aosTime
-        if recordTime<1:
+    	if recordTime<1:
 	    recordTime=1
     # Go on, for now we'll name recordings and images by Unix timestamp.
-    fname=str(aosTime)
-    xfname=satName
-    print "Beginning pass of "+satName+". Predicted start "+aosTimeCnv+" and end "+losTimeCnv+". Will record for "+str(recordTime).split(".")[0]+" seconds."
-    writeStatus(freq,aosTimeCnv,losTimeCnv,str(losTime),str(recordTime).split(".")[0],satName,'RECORDING')
-    recordWAV(freq,fname,recordTime,xfname)
-    #recordDOP(freq,fname,recordTime,xfname)
-    print "Decoding data"
-    if xfname in ('NOAA 15', 'NOAA 19', 'NOAA 18'):
-	writeStatus(freq,aosTimeCnv,losTimeCnv,str(losTime),str(recordTime).split(".")[0],satName,'DECODING')
-	decode(fname,aosTime,satName) # make picture
-    print "Finished pass of "+satName+" at "+losTimeCnv+". Sleeping for 10 seconds"
+    if maxElev>int(minElev):
+	fname=str(aosTime)
+	xfname=satName
+#	subprocess.call('sudo /etc/init.d/fr24feed stop', shell=True)
+	print "Beginning pass of "+satName+" at "+str(maxElev)+" deg. elev.\nPredicted start "+aosTimeCnv+" and end "+losTimeCnv+".\n Will record for "+str(recordTime).split(".")[0]+" seconds."
+	writeStatus(freq,aosTimeCnv,losTimeCnv,str(losTime),str(recordTime).split(".")[0],satName,'RECORDING')
+	recordWAV(freq,fname,recordTime,xfname)
+	#recordDOP(freq,fname,recordTime,xfname)
+	print "Decoding data"
+	if xfname in ('NOAA 15', 'NOAA 19', 'NOAA 18'):
+	    writeStatus(freq,aosTimeCnv,losTimeCnv,str(losTime),str(recordTime).split(".")[0],satName,'DECODING')
+	    decode(fname,aosTime,satName) # make picture
+	print "Finished pass of "+satName+" at "+losTimeCnv+". Sleeping for 10 seconds"
     # Is this really needed?
+#	subprocess.call('sudo /etc/init.d/fr24feed start', shell=True)
+    else:
+	print "Too low for good reception ("+str(minElev)+" deg. min. | act: "+str(maxElev)+" deg. \n\tSleeping for "+str(recordTime)+" seconds..."
+	time.sleep(recordTime)
     time.sleep(10.0)
 
