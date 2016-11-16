@@ -79,9 +79,9 @@ minElev='8'
 ##
 # SCP Config, works for key autorization
 #
-SCP_USER='hypno'
-SCP_HOST='somehost'
-SCP_DIR='/tmp/'
+SCP_USER='m'
+SCP_HOST='costam.mydevil.net'
+SCP_DIR='/home/syfjakc'
 # Send LOG with imagefile?
 LOG_SCP='y'
 # Send image to remote server?
