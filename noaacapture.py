@@ -1,16 +1,24 @@
-#!/usr/bin/python
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import time
 import datetime
 from time import gmtime, strftime
 import pypredict
 import subprocess
 import os
+import re
+
+##
+## Config header, sorry
+## TODO: Better config system
+##
 
 # Satellite names in TLE plus their frequency
 satellites = ['NOAA 18','NOAA 15','NOAA 19']
 freqs = [137912500, 137620000, 137100000]
 # Dongle gain
-dongleGain='46'
+dongleGain='48.0'
 #
 # Dongle PPM shift, hopefully this will change to reflect different PPM on freq
 dongleShift='53'
@@ -46,27 +54,47 @@ imgdir='/opt/wxsat/img'
 mapDir='/opt/wxsat/maps'
 # Options for wxtoimg
 # Create map overlay?
-wxAddOverlay='no'
+wxAddOverlay='yes'
 # Image outputs
 wxEnhHVC='no'
 wxEnhHVCT='no'
 wxEnhMSA='no'
-wxEnhMCIR='no'
+wxEnhMCIR='yes'
 # Other tunables
 wxQuietOutput='no'
 wxDecodeAll='yes'
 wxJPEGQuality='75'
 # Adding overlay text
-wxAddTextOverlay='no'
-wxOverlayText='text'
+wxAddTextOverlay='yes'
+wxOverlayText='ATOMUS autowxsat'
 #
 # Various options
 # Should this script create spectrogram : yes/no
 createSpectro='yes'
 # Use doppler shift for correction, not used right now - leave as is
 runDoppler='no'
+# Minimum elevation
+minElev='8'
+
+##
+# SCP Config, works for key autorization
 #
-minElev='5'
+SCP_USER='hypno'
+SCP_HOST='somehost'
+SCP_DIR='/tmp/'
+# Send LOG with imagefile?
+LOG_SCP='y'
+# Send image to remote server?
+IMG_SCP='y'
+
+
+	###############################
+	###                          ##
+	###     Here be dragons.     ##
+	###                          ##
+	###############################
+
+
 # Read qth file for station data
 stationFileDir=os.path.expanduser('~')
 stationFilex=stationFileDir+'/.predict/predict.qth'
@@ -79,6 +107,31 @@ stationAlt=str(stationData[3]).rstrip().strip()
 stationFile.close()
 
 stationLonNeg=float(stationLon)*-1
+
+##
+## Color output declarations
+## 
+
+class bcolors:
+    HEADER = '\033[95m'
+    CYAN = '\033[96m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[97m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    GRAY = '\033[37m'
+    UNDERLINE = '\033[4m'
+
+logLineStart=bcolors.BOLD+bcolors.HEADER+"***>\t"+bcolors.ENDC+bcolors.OKGREEN
+logLineEnd=bcolors.ENDC
+
+## 
+## Other stuff
+##
 
 if wxQuietOutput in ('yes', 'y', '1'):
     wxQuietOpt='-q'
@@ -95,6 +148,9 @@ if wxAddTextOverlay in ('yes', 'y', '1'):
 else:
     wxAddText='-C wxOther:noOverlay'
 
+##
+## Execution loop declaration
+##
 
 def runForDuration(cmdline, duration):
     try:
@@ -105,7 +161,12 @@ def runForDuration(cmdline, duration):
         print "OS Error during command: "+" ".join(cmdline)
         print "OS Error: "+e.strerror
 
+##
+## FM Recorder definition
+##
+
 def recordFM(freq, fname, duration, xfname):
+    print bcolors.GRAY
     xfNoSpace=xfname.replace(" ","")
     cmdline = ['rtl_fm',\
 		'-f',str(freq),\
@@ -117,8 +178,12 @@ def recordFM(freq, fname, duration, xfname):
 		'-E','offset',\
 		'-p',dongleShift,\
 		recdir+'/'+xfNoSpace+'-'+fname+'.raw' ]
-
     runForDuration(cmdline, duration)
+
+##
+## Recorder with doppler shift correction.
+## Absolutely TODO! 
+##
 
 def recordDOP(freq, fname, duration, xfname):
     xfNoSpace=xfname.replace(" ","")
@@ -139,6 +204,10 @@ def recordDOP(freq, fname, duration, xfname):
 
     runForDuration(cmdline, duration)
 
+##
+## TODO: Meteor M2 tests, no luck
+##
+
 def recordMETEOR(freq, fname, duration, xfname):
     xfNoSpace=xfname.replace(" ","")
     cmdline = ['rtl_fm',\
@@ -154,25 +223,36 @@ def recordMETEOR(freq, fname, duration, xfname):
 
     runForDuration(cmdline, duration)
 
+##
+## Very simple remote display support
+##
+
 def writeStatus(freq, aosTime, losTime, losTimeUnix, recordTime, xfName, status):
-    statFile=open('/tmp/rec_info', 'r+')
+    statFile=open('/tmp/rec_info', 'w+')
     if status in ('RECORDING'):
-	statFile.write(str(xfName)+' | '+'AOS.'+str(aosTime)+'REC:'+str(recordTime)+'s | LOS.'+str(losTime)+'\nR\n'+str(losTimeUnix)+'\n')
+	statFile.write("ODBIOR;tak;"+str(xfName)+' AOS@'+str(aosTime)+'REC@'+str(recordTime)+'s LOS@'+str(losTime))
     elif status in ('DECODING'):
-	statFile.write('FINISHED PASS OF '+str(xfName)+' AT '+str(losTime)+'\n'+'DECODING IMAGE'+'\n'+str(losTimeUnix)+'\n')
+	statFile.write('ODBIOR;nie;Dekodowanie '+str(xfName))
     elif status in ('WAITING'):
-	statFile.write('NXT: '+str(xfName)+' (AOS.'+str(aosTime)+') \nW\n'+str(losTimeUnix)+'\n')
+	statFile.write('ODBIOR;nie;'+str(xfName)+' (AOS@'+str(aosTime)+')')
     statFile.close
 
+##
+## Transcoding module
+##
 
 def transcode(fname):
     xfNoSpace=xfname.replace(" ","")
-    print 'Transcoding...'
+    print logLineStart+'Transcoding...'+bcolors.YELLOW
     cmdline = ['sox','-t','raw','-r',sample,'-es','-b','16','-c','1','-V1',recdir+'/'+xfNoSpace+'-'+fname+'.raw',recdir+'/'+xfNoSpace+'-'+fname+'.wav','rate',wavrate]
     subprocess.call(cmdline)
     if removeRAW in ('yes', 'y', '1'):
-	print 'Removing RAW data'
+	print logLineStart+bcolors.ENDC+bcolors.RED+'Removing RAW data'+logLineEnd
 	os.remove(recdir+'/'+xfNoSpace+'-'+fname+'.raw')
+
+##
+## Doppler calculation
+##
 
 def doppler(fname,emergeTime):
     cmdline = ['doppler', 
@@ -185,28 +265,65 @@ def doppler(fname,emergeTime):
     '-s', sample ]
     subprocess.call(cmdline)
 
+##
+## Overlay map creator, still buggy
+## TODO: ?
+##
+
 def createoverlay(fname,aosTime,satName):
-    print 'Creating Map Overlay...'
+    print logLineStart+'Creating Map Overlay...'+logLineEnd
+    aosTimeO=int(aosTime)+int('2')
     cmdline = ['wxmap',
     '-T',satName,\
     '-G',stationFileDir+'/.predict/',\
     '-H','predict.tle',\
     '-M','0',\
     '-L',stationLat+'/'+str(stationLonNeg)+'/'+stationAlt,\
-    str(aosTime), mapDir+'/'+str(fname)+'-map.png']
-    print cmdline
-    subprocess.call(cmdline)
+    str(aosTimeO), mapDir+'/'+str(fname)+'-map.png']
+    #print cmdline
+    overlay_log = open(mapDir+'/'+str(fname)+'-map.png.txt',"w+")
+    subprocess.call(cmdline, stderr=overlay_log, stdout=overlay_log)
+    overlay_log.close()
+#    for line in open(mapDir+'/'+str(fname)+'-map.png.txt',"r").readlines():
+#        res=line.replace("\n", "")
+#        res2=re.sub(r"(\d)", r"\033[96m\1\033[94m", res)
+#        print logLineStart+bcolors.OKBLUE+res2+logLineEnd
 
-def decode(fname,aosTime,satName):
+##
+## Various NOAA picture decoders
+## This uses wxtoimg and predict (too!), so these need to be running well!!
+##
+
+def decode(fname,aosTime,satName,maxElev):
     xfNoSpace=xfname.replace(" ","")
     satTimestamp = int(fname)
     fileNameC = datetime.datetime.fromtimestamp(satTimestamp).strftime('%Y%m%d-%H%M')
     if wxAddOverlay in ('yes', 'y', '1'):
-	print 'Creating basic image with overlay'
+	print logLineStart+bcolors.OKBLUE+'Creating overlay map'+logLineEnd
 	createoverlay(fname,aosTime,satName)
-	cmdline = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg']
-	print cmdline
-	subprocess.call(cmdline)
+	print logLineStart+'Creating basic image with overlay map'+logLineEnd
+
+	m = open(imgdir+'/'+satName+'/'+fileNameC+'-normal-map.jpg.txt',"w+")
+    ### header
+	m.write('\nSAT: '+str(xfNoSpace)+', Elevation max: '+str(maxElev)+', Date: '+str(fname)+'\n')
+##
+## Copy file contents
+##
+	for psikus in open(mapDir+'/'+str(fname)+'-map.png.txt',"r").readlines():
+	    res=psikus.replace("\n", " \n")
+	    m.write(res)
+
+	cmdline = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-normal-map.jpg']
+	subprocess.call(cmdline, stderr=m, stdout=m)
+
+	m.write('\nMax elevation was: '+str(maxElev)+'\n')
+	m.close()
+
+	for line in open(imgdir+'/'+satName+'/'+fileNameC+'-normal-map.jpg.txt',"r").readlines():
+	    res=line.replace("\n", "")
+	    res2=re.sub(r"(\d)", r"\033[96m\1\033[94m", res)
+	    print logLineStart+bcolors.OKBLUE+res2+logLineEnd
+
 	if wxEnhHVC in ('yes', 'y', '1'):
 	    print 'Creating HVC image'
 	    cmdline_hvc = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','HVC','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvc.jpg']
@@ -221,12 +338,43 @@ def decode(fname,aosTime,satName):
 	    subprocess.call(cmdline_msa)
 	if wxEnhMCIR in ('yes', 'y', '1'):
 	    print 'Creating MCIR image'
-	    cmdline_mcir = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MCIR','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-mcir.jpg']
-	    subprocess.call(cmdline_mcir)
+	    mcir_log = open(imgdir+'/'+satName+'/'+fileNameC+'-mcir-map.jpg.txt',"w+")
+	    mcir_log.write('\nMCIR SAT: '+str(xfNoSpace)+', Elevation max: '+str(maxElev)+', Date: '+str(fname)+'\n')
+	    cmdline_mcir = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MCIR','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-mcir-map.jpg']
+	    subprocess.call(cmdline_mcir, stderr=mcir_log, stdout=mcir_log)
+	    if LOG_SCP in ('yes', 'y', '1'):
+		print logLineStart+"Sending MCIR flight and decode logs..."+bcolors.YELLOW
+		for psikus in open(mapDir+'/'+str(fname)+'-map.png.txt',"r").readlines():
+		    res=psikus.replace("\n", " \n")
+		    mcir_log.write(res)
+		cmdline_scp_log = [ '/usr/bin/scp',imgdir+'/'+satName+'/'+fileNameC+'-mcir-map.jpg.txt',SCP_USER+'@'+SCP_HOST+':'+SCP_DIR+'/'+satName.replace(" ","\ ")+'-'+fileNameC+'-mcir-map.jpg.txt' ] 
+		subprocess.call(cmdline_scp_log)
+	    if IMG_SCP in ('yes', 'y', '1'):
+		print logLineStart+"Sending MCIR image with overlay map... "+bcolors.YELLOW
+		cmdline_scp_img = [ '/usr/bin/scp',imgdir+'/'+satName+'/'+fileNameC+'-mcir-map.jpg',SCP_USER+'@'+SCP_HOST+':'+SCP_DIR+'/'+satName.replace(" ","\ ")+'-'+fileNameC+'-mcir-map.jpg' ] 
+		subprocess.call(cmdline_scp_img)
+		print logLineStart+"Wysłano, przechodzę dalej"+logLineEnd
+
+	if LOG_SCP in ('yes', 'y', '1'):
+	    print logLineStart+"Sending flight and decode logs..."+bcolors.YELLOW
+	    cmdline_scp_log = [ '/usr/bin/scp',imgdir+'/'+satName+'/'+fileNameC+'-normal-map.jpg.txt',SCP_USER+'@'+SCP_HOST+':'+SCP_DIR+'/'+satName.replace(" ","\ ")+'-'+fileNameC+'-normal-map.jpg.txt' ] 
+	    subprocess.call(cmdline_scp_log)
+	if IMG_SCP in ('yes', 'y', '1'):
+	    print logLineStart+"Sending base image with map: "+bcolors.YELLOW
+	    cmdline_scp_img = [ '/usr/bin/scp',imgdir+'/'+satName+'/'+fileNameC+'-normal-map.jpg',SCP_USER+'@'+SCP_HOST+':'+SCP_DIR+'/'+satName.replace(" ","\ ")+'-'+fileNameC+'-normal-map.jpg' ] 
+	    subprocess.call(cmdline_scp_img)
+	    print logLineStart+"Sending OK, go on..."+logLineEnd
     else:
-	print 'Creating basic image without map'
+	print logLineStart+'Creating basic image without map'+logLineEnd
+	r = open(imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg.txt',"w+")
 	cmdline = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-t','NOAA',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg']
-	subprocess.call(cmdline)
+	r.write('\nSAT: '+str(xfNoSpace)+', Elevation max: '+str(maxElev)+', Date: '+str(fname)+'\n')
+	subprocess.call(cmdline, stderr=r, stdout=r)
+	r.close()
+	for line in open(imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg.txt',"r").readlines():
+	    res=line.replace("\n", "")
+	    res2=re.sub(r"(\d)", r"\033[96m\1\033[94m", res)
+	    print logLineStart+bcolors.OKBLUE+res2+logLineEnd
 	if wxEnhHVC in ('yes', 'y', '1'):
 	    print 'Creating HVC image'
 	    cmdline_hvc = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','HVC',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvc.jpg']
@@ -243,12 +391,23 @@ def decode(fname,aosTime,satName):
 	    print 'Creating MCIR image'
 	    cmdline_mcir = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MCIR',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-mcir.jpg']
 	    subprocess.call(cmdline_mcir)
+	if LOG_SCP in ('yes', 'y', '1'):
+	    print logLineStart+"Sending flight and decode logs..."+bcolors.YELLOW
+	    cmdline_scp_log = [ '/usr/bin/scp',imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg.txt',SCP_USER+'@'+SCP_HOST+':'+SCP_DIR+'/'+satName.replace(" ","\ ")+'-'+fileNameC+'-normal.jpg.txt' ] 
+	    subprocess.call(cmdline_scp_log)
+	if IMG_SCP in ('yes', 'y', '1'):
+	    print logLineStart+"Sending base image without overlay map... "+bcolors.YELLOW
+	    cmdline_scp_img = [ '/usr/bin/scp',imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg',SCP_USER+'@'+SCP_HOST+':'+SCP_DIR+'/'+satName.replace(" ","\ ")+'-'+fileNameC+'-normal.jpg' ] 
+	    subprocess.call(cmdline_scp_img)
+	    print logLineStart+"Sent, go on..."+logLineEnd
+
+##
+## Record and transcode wave file
+##
 
 def recordWAV(freq,fname,duration,xfname):
-    #print xfname
     if xfname in ('NOAA 15', 'NOAA 19', 'NOAA 18'):
 	recordFM(freq,fname,duration,xfname)
-#	recordDOP(freq,fname,duration,xfname)
 	transcode(fname)
 	if createSpectro in ('yes', 'y', '1'):
 	    spectrum(fname)
@@ -257,13 +416,19 @@ def recordWAV(freq,fname,duration,xfname):
 	if createSpectro in ('yes', 'y', '1'):
 	    spectrum(fname)
 
+##
+## Spectrum creation module
+##
+
 def spectrum(fname):
     xfNoSpace=xfname.replace(" ","")
-    # Changed spectrum generation, now it creates spectrogram from recorded WAV file
-    # Optional
-    print 'Creating flight spectrum'
+    print logLineStart+'Creating flight spectrum'+logLineEnd
     cmdline = ['sox',recdir+'/'+xfNoSpace+'-'+fname+'.wav', '-n', 'spectrogram','-o',specdir+'/'+xfNoSpace+'-'+fname+'.png']
     subprocess.call(cmdline)
+
+##
+## Passage finder loop
+##
 
 def findNextPass():
     predictions = [pypredict.aoslos(s) for s in satellites]
@@ -273,19 +438,31 @@ def findNextPass():
             freqs[nextIndex],\
             predictions[nextIndex]) 
 
+##
+## Now magic
+##
+
 while True:
+
     (satName, freq, (aosTime, losTime,maxElev)) = findNextPass()
     now = time.time()
     towait = aosTime-now
+
     aosTimeCnv=strftime('%H:%M:%S', time.localtime(aosTime))
     emergeTimeUtc=strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(aosTime))
     losTimeCnv=strftime('%H:%M:%S', time.localtime(losTime))
     dimTimeUtc=strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(losTime))
+##
+## OK, now we have to decide what if recording or sleeping
+##
     if towait>0:
-        print "waiting "+str(towait).split(".")[0]+" seconds (emerging "+aosTimeCnv+") for "+satName
+        print logLineStart+"waiting "+bcolors.CYAN+str(towait).split(".")[0]+bcolors.OKGREEN+" seconds (emerging "+bcolors.CYAN+aosTimeCnv+bcolors.OKGREEN+") for "+bcolors.YELLOW+satName+bcolors.OKGREEN+" @ "+bcolors.CYAN+str(maxElev)+bcolors.OKGREEN+"° el."+logLineEnd
         writeStatus(freq,aosTimeCnv,losTimeCnv,aosTime,towait,satName,'WAITING')
+## Disable sleeper below to test
     	time.sleep(towait)
-	# If the script broke and sat is passing by - change record time to reflect time change
+##
+## If the script broke - or it was recording other one - and a bird is already passing by - change record time to real one
+##
     if aosTime<now:
         recordTime=losTime-now
         if recordTime<1:
@@ -294,24 +471,56 @@ while True:
 	recordTime=losTime-aosTime
     	if recordTime<1:
 	    recordTime=1
-    # Go on, for now we'll name recordings and images by Unix timestamp.
+##
+## Dirty, but for now we'll name recordings and images by Unix timestamp.
+##
     if maxElev>int(minElev):
 	fname=str(aosTime)
 	xfname=satName
-#	subprocess.call('sudo /etc/init.d/fr24feed stop', shell=True)
-	print "Beginning pass of "+satName+" at "+str(maxElev)+" deg. elev.\nPredicted start "+aosTimeCnv+" and end "+losTimeCnv+".\n Will record for "+str(recordTime).split(".")[0]+" seconds."
+
+## Own place scripts.
+## TODO: Own process
+##
+#	subprocess.call('sudo /etc/init.d/pymultimonaprs stop', shell=True)
+
+	print logLineStart+"Beginning pass of "+bcolors.YELLOW+satName+bcolors.OKGREEN+" at "+bcolors.CYAN+str(maxElev)+"°"+bcolors.OKGREEN+" elev.\n"+logLineStart+"Predicted start "+bcolors.CYAN+aosTimeCnv+bcolors.OKGREEN+" and end "+bcolors.CYAN+losTimeCnv+bcolors.OKGREEN+".\n"+logLineStart+"Will record for "+bcolors.CYAN+str(recordTime).split(".")[0]+bcolors.OKGREEN+" seconds."+logLineEnd
 	writeStatus(freq,aosTimeCnv,losTimeCnv,str(losTime),str(recordTime).split(".")[0],satName,'RECORDING')
+
+##
+## Let's record
+##
 	recordWAV(freq,fname,recordTime,xfname)
-	#recordDOP(freq,fname,recordTime,xfname)
-	print "Decoding data"
+
+## DEBUG
+##
+##	recordWAV(freq,fname,5,xfname)
+##	recordDOP(freq,fname,recordTime,xfname)
+##
+	print logLineStart+"Decoding data"+logLineEnd
+####
 	if xfname in ('NOAA 15', 'NOAA 19', 'NOAA 18'):
 	    writeStatus(freq,aosTimeCnv,losTimeCnv,str(losTime),str(recordTime).split(".")[0],satName,'DECODING')
-	    decode(fname,aosTime,satName) # make picture
-	print "Finished pass of "+satName+" at "+losTimeCnv+". Sleeping for 10 seconds"
-    # Is this really needed?
-#	subprocess.call('sudo /etc/init.d/fr24feed start', shell=True)
+	    decode(fname,aosTime,satName,maxElev) # make picture
+###
+	print logLineStart+"Finished pass of "+bcolors.YELLOW+satName+bcolors.OKGREEN+" at "+bcolors.CYAN+losTimeCnv+bcolors.OKGREEN+". Sleeping for"+bcolors.CYAN+" 10"+bcolors.OKGREEN+" seconds"+logLineEnd
+##
+## Is this really needed?
+##
+## TODO: Call custom script
+#	subprocess.call('sudo /etc/init.d/pymultimonaprs start', shell=True)
+#
     else:
-	print "Too low for good reception ("+str(minElev)+" deg. min. | act: "+str(maxElev)+" deg. \n\tSleeping for "+str(recordTime)+" seconds..."
+###
+### Satellite is too low...
+### Let's sleep and just wait..
+###
+	print logLineStart+bcolors.ENDC+bcolors.WARNING+"Too low for good reception ("+bcolors.CYAN+str(minElev)+"°"+bcolors.WARNING+" > max: "+bcolors.CYAN+str(maxElev)+"°"+bcolors.WARNING+" elev. )\n\tSleeping for "+bcolors.CYAN+str(recordTime)+bcolors.WARNING+" seconds..."+logLineEnd
 	time.sleep(recordTime)
+
+## Main loop done
+## 
+## Sleep for a moment...
+## And do everything again
+
     time.sleep(10.0)
 
