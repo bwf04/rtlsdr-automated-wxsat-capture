@@ -61,12 +61,20 @@ wxEnhHVCT='no'
 wxEnhMSA='no'
 wxEnhMCIR='yes'
 # Other tunables
+# Turning it off creates empty logs...
 wxQuietOutput='no'
+# Decode all despite low signal?
 wxDecodeAll='yes'
+# JPEG quality
 wxJPEGQuality='75'
 # Adding overlay text
-wxAddTextOverlay='yes'
-wxOverlayText='ATOMUS autowxsat'
+wxAddTextOverlay='no'
+wxOverlayText='autowxsat'
+# Overlay offset - wxtoimg
+# Negative value - push LEFT/UP
+# Positive value - push RIGHT/DOWN
+wxOverlayOffsetX='0'
+wxOverlayOffsetY='0'
 #
 # Various options
 # Should this script create spectrogram : yes/no
@@ -74,18 +82,17 @@ createSpectro='yes'
 # Use doppler shift for correction, not used right now - leave as is
 runDoppler='no'
 # Minimum elevation
-minElev='8'
-
+minElev='9'
 ##
-# SCP Config, works for key autorization
+# SCP Config, works best with key authorization
 #
-SCP_USER='m'
-SCP_HOST='costam.mydevil.net'
-SCP_DIR='/home/syfjakc'
+SCP_USER='SCP_USER'
+SCP_HOST='SCP_HOST'
+SCP_DIR='SCP_DIR'
 # Send LOG with imagefile?
-LOG_SCP='y'
+LOG_SCP='n'
 # Send image to remote server?
-IMG_SCP='y'
+IMG_SCP='n'
 
 
 	###############################
@@ -224,17 +231,19 @@ def recordMETEOR(freq, fname, duration, xfname):
     runForDuration(cmdline, duration)
 
 ##
-## Very simple remote display support
+## Status builder. Crazy shit.
 ##
 
-def writeStatus(freq, aosTime, losTime, losTimeUnix, recordTime, xfName, status):
+def writeStatus(freq, aosTime, losTime, losTimeUnix, recordTime, xfName, maxElev, status):
     statFile=open('/tmp/rec_info', 'w+')
     if status in ('RECORDING'):
-	statFile.write("ODBIOR;tak;"+str(xfName)+' AOS@'+str(aosTime)+'REC@'+str(recordTime)+'s LOS@'+str(losTime))
+	statFile.write("ODBIOR;tak;"+str(xfName)+' AOS@'+str(aosTime)+' LOS@'+str(losTime)+' REC@'+str(recordTime)+'s. max el.@'+str(maxElev)+'°')
     elif status in ('DECODING'):
 	statFile.write('ODBIOR;nie;Dekodowanie '+str(xfName))
     elif status in ('WAITING'):
-	statFile.write('ODBIOR;nie;'+str(xfName)+' (AOS@'+str(aosTime)+')')
+	statFile.write('ODBIOR;nie;'+str(xfName)+' (AOS@'+str(aosTime)+') @'+str(maxElev)+'° elev. max')
+    elif status in ('TOOLOW'):
+	statFile.write('ODBIOR;nie;'+str(xfName)+' (AOS@'+str(aosTime)+') zbyt nisko ('+str(maxElev)+'°), czekam '+str(recordTime)+'s.')
     statFile.close
 
 ##
@@ -272,12 +281,13 @@ def doppler(fname,emergeTime):
 
 def createoverlay(fname,aosTime,satName):
     print logLineStart+'Creating Map Overlay...'+logLineEnd
-    aosTimeO=int(aosTime)+int('2')
+    aosTimeO=int(aosTime)+int('20')
     cmdline = ['wxmap',
     '-T',satName,\
     '-G',stationFileDir+'/.predict/',\
     '-H','predict.tle',\
     '-M','0',\
+    '-o', \
     '-L',stationLat+'/'+str(stationLonNeg)+'/'+stationAlt,\
     str(aosTimeO), mapDir+'/'+str(fname)+'-map.png']
     #print cmdline
@@ -313,10 +323,10 @@ def decode(fname,aosTime,satName,maxElev):
 	    res=psikus.replace("\n", " \n")
 	    m.write(res)
 
-	cmdline = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-normal-map.jpg']
+	cmdline = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-o','-R1','-t','NOAA','-Q '+wxJPEGQuality,recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-normal-map.jpg']
+#	print cmdline
 	subprocess.call(cmdline, stderr=m, stdout=m)
-
-	m.write('\nMax elevation was: '+str(maxElev)+'\n')
+#	m.write('\nMax elevation was: '+str(maxElev)+'\n')
 	m.close()
 
 	for line in open(imgdir+'/'+satName+'/'+fileNameC+'-normal-map.jpg.txt',"r").readlines():
@@ -326,21 +336,52 @@ def decode(fname,aosTime,satName,maxElev):
 
 	if wxEnhHVC in ('yes', 'y', '1'):
 	    print 'Creating HVC image'
-	    cmdline_hvc = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','HVC','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvc.jpg']
-	    subprocess.call(cmdline_hvc)
+	    hvc_log = open(imgdir+'/'+satName+'/'+fileNameC+'-hvc-map.jpg.txt',"w+")
+	    hvc_log.write('\nHVC SAT: '+str(xfNoSpace)+', Elevation max: '+str(maxElev)+', Date: '+str(fname)+'\n')
+	    cmdline_hvc = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-K','-o','-R1','-Q '+wxJPEGQuality,'-e','HVC','-m',mapDir+'/'+fname+'-map.png,'+wxOverlayOffetX+','+wxOverlayOffsetY,recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvc-map.jpg']
+	    subprocess.call(cmdline_hvc, stderr=hvc_log, stdout=hvc_log)
+	    if LOG_SCP in ('yes', 'y', '1'):
+		print logLineStart+"Sending HVC flight and decode logs..."+bcolors.YELLOW
+		for psikus in open(mapDir+'/'+str(fname)+'-map.png.txt',"r").readlines():
+		    res=psikus.replace("\n", " \n")
+		    hvc_log.write(res)
+		cmdline_scp_log = [ '/usr/bin/scp',imgdir+'/'+satName+'/'+fileNameC+'-hvc-map.jpg.txt',SCP_USER+'@'+SCP_HOST+':'+SCP_DIR+'/'+satName.replace(" ","\ ")+'-'+fileNameC+'-hvc-map.jpg.txt' ] 
+		subprocess.call(cmdline_scp_log)
+	    if IMG_SCP in ('yes', 'y', '1'):
+		print logLineStart+"Sending HVC image with overlay map... "+bcolors.YELLOW
+		cmdline_scp_img = [ '/usr/bin/scp',imgdir+'/'+satName+'/'+fileNameC+'-hvc-map.jpg',SCP_USER+'@'+SCP_HOST+':'+SCP_DIR+'/'+satName.replace(" ","\ ")+'-'+fileNameC+'-hvc-map.jpg' ] 
+		subprocess.call(cmdline_scp_img)
+		print logLineStart+"Wysłano, przechodzę dalej"+logLineEnd
+
 	if wxEnhHVCT in ('yes', 'y', '1'):
-	    print 'Creating HVCT image'
-	    cmdline_hvct = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','HVCT','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-hvct.jpg']
+	    print logLineStart+'Creating HVCT image'+logLineEnd
+	    cmdline_hvct = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-o','-R1','-Q '+wxJPEGQuality,'-e','HVCT','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-hvct.jpg']
 	    subprocess.call(cmdline_hvct)
+
 	if wxEnhMSA in ('yes', 'y', '1'):
-	    print 'Creating MSA image'
-	    cmdline_msa = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MSA','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-msa.jpg']
-	    subprocess.call(cmdline_msa)
+	    print logLineStart+'Creating MSA image'+logLineEnd
+	    msa_log = open(imgdir+'/'+satName+'/'+fileNameC+'-msa-map.jpg.txt',"w+")
+	    msa_log.write('\nMSA SAT: '+str(xfNoSpace)+', Elevation max: '+str(maxElev)+', Date: '+str(fname)+'\n')
+	    cmdline_msa = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-o','-R1','-Q '+wxJPEGQuality,'-e','MSA','-m',mapDir+'/'+fname+'-map.png,'+wxOverlayOffsetX+','+wxOverlayOffsetY,recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-msa-map.jpg']
+	    subprocess.call(cmdline_msa, stderr=msa_log, stdout=msa_log)
+	    if LOG_SCP in ('yes', 'y', '1'):
+		print logLineStart+"Sending MSA flight and decode logs..."+bcolors.YELLOW
+		for psikus in open(mapDir+'/'+str(fname)+'-map.png.txt',"r").readlines():
+		    res=psikus.replace("\n", " \n")
+		    msa_log.write(res)
+		cmdline_scp_log = [ '/usr/bin/scp',imgdir+'/'+satName+'/'+fileNameC+'-msa-map.jpg.txt',SCP_USER+'@'+SCP_HOST+':'+SCP_DIR+'/'+satName.replace(" ","\ ")+'-'+fileNameC+'-msa-map.jpg.txt' ] 
+		subprocess.call(cmdline_scp_log)
+	    if IMG_SCP in ('yes', 'y', '1'):
+		print logLineStart+"Sending MSA image with overlay map... "+bcolors.YELLOW
+		cmdline_scp_img = [ '/usr/bin/scp',imgdir+'/'+satName+'/'+fileNameC+'-msa-map.jpg',SCP_USER+'@'+SCP_HOST+':'+SCP_DIR+'/'+satName.replace(" ","\ ")+'-'+fileNameC+'-msa-map.jpg' ] 
+		subprocess.call(cmdline_scp_img)
+		print logLineStart+"Wysłano, przechodzę dalej"+logLineEnd
+
 	if wxEnhMCIR in ('yes', 'y', '1'):
-	    print 'Creating MCIR image'
+	    print logLineStart+'Creating MCIR image'+logLineEnd
 	    mcir_log = open(imgdir+'/'+satName+'/'+fileNameC+'-mcir-map.jpg.txt',"w+")
 	    mcir_log.write('\nMCIR SAT: '+str(xfNoSpace)+', Elevation max: '+str(maxElev)+', Date: '+str(fname)+'\n')
-	    cmdline_mcir = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MCIR','-m',mapDir+'/'+fname+'-map.png',recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-mcir-map.jpg']
+	    cmdline_mcir = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-o','-R1','-Q '+wxJPEGQuality,'-e','MCIR','-m',mapDir+'/'+fname+'-map.png,'+wxOverlayOffsetX+','+wxOverlayOffsetY,recdir+'/'+xfNoSpace+'-'+fname+'.wav',imgdir+'/'+satName+'/'+fileNameC+'-mcir-map.jpg']
 	    subprocess.call(cmdline_mcir, stderr=mcir_log, stdout=mcir_log)
 	    if LOG_SCP in ('yes', 'y', '1'):
 		print logLineStart+"Sending MCIR flight and decode logs..."+bcolors.YELLOW
@@ -367,7 +408,7 @@ def decode(fname,aosTime,satName,maxElev):
     else:
 	print logLineStart+'Creating basic image without map'+logLineEnd
 	r = open(imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg.txt',"w+")
-	cmdline = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-t','NOAA',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg']
+	cmdline = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-o','-R1','-Q '+wxJPEGQuality,'-t','NOAA',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-normal.jpg']
 	r.write('\nSAT: '+str(xfNoSpace)+', Elevation max: '+str(maxElev)+', Date: '+str(fname)+'\n')
 	subprocess.call(cmdline, stderr=r, stdout=r)
 	r.close()
@@ -377,19 +418,19 @@ def decode(fname,aosTime,satName,maxElev):
 	    print logLineStart+bcolors.OKBLUE+res2+logLineEnd
 	if wxEnhHVC in ('yes', 'y', '1'):
 	    print 'Creating HVC image'
-	    cmdline_hvc = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','HVC',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvc.jpg']
+	    cmdline_hvc = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-o','-R1','-Q '+wxJPEGQuality,'-e','HVC',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvc.jpg']
 	    subprocess.call(cmdline_hvc)
 	if wxEnhHVCT in ('yes', 'y', '1'):
 	    print 'Creating HVCT image'
-	    cmdline_hvct = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','HVCT',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvct.jpg']
+	    cmdline_hvct = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-o','-R1','-Q '+wxJPEGQuality,'-e','HVCT',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvct.jpg']
 	    subprocess.call(cmdline_hvct)
 	if wxEnhMSA in ('yes', 'y', '1'):
 	    print 'Creating MSA image'
-	    cmdline_msa = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MSA',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-msa.jpg']
+	    cmdline_msa = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-o','-R1','-Q '+wxJPEGQuality,'-e','MSA',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-msa.jpg']
 	    subprocess.call(cmdline_msa)
 	if wxEnhMCIR in ('yes', 'y', '1'):
 	    print 'Creating MCIR image'
-	    cmdline_mcir = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-Q '+wxJPEGQuality,'-e','MCIR',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-mcir.jpg']
+	    cmdline_mcir = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-o','-R1','-Q '+wxJPEGQuality,'-e','MCIR',recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-mcir.jpg']
 	    subprocess.call(cmdline_mcir)
 	if LOG_SCP in ('yes', 'y', '1'):
 	    print logLineStart+"Sending flight and decode logs..."+bcolors.YELLOW
@@ -457,8 +498,7 @@ while True:
 ##
     if towait>0:
         print logLineStart+"waiting "+bcolors.CYAN+str(towait).split(".")[0]+bcolors.OKGREEN+" seconds (emerging "+bcolors.CYAN+aosTimeCnv+bcolors.OKGREEN+") for "+bcolors.YELLOW+satName+bcolors.OKGREEN+" @ "+bcolors.CYAN+str(maxElev)+bcolors.OKGREEN+"° el."+logLineEnd
-        writeStatus(freq,aosTimeCnv,losTimeCnv,aosTime,towait,satName,'WAITING')
-## Disable sleeper below to test
+        writeStatus(freq,aosTimeCnv,losTimeCnv,aosTime,towait,satName,maxElev,'WAITING')
     	time.sleep(towait)
 ##
 ## If the script broke - or it was recording other one - and a bird is already passing by - change record time to real one
@@ -484,7 +524,7 @@ while True:
 #	subprocess.call('sudo /etc/init.d/pymultimonaprs stop', shell=True)
 
 	print logLineStart+"Beginning pass of "+bcolors.YELLOW+satName+bcolors.OKGREEN+" at "+bcolors.CYAN+str(maxElev)+"°"+bcolors.OKGREEN+" elev.\n"+logLineStart+"Predicted start "+bcolors.CYAN+aosTimeCnv+bcolors.OKGREEN+" and end "+bcolors.CYAN+losTimeCnv+bcolors.OKGREEN+".\n"+logLineStart+"Will record for "+bcolors.CYAN+str(recordTime).split(".")[0]+bcolors.OKGREEN+" seconds."+logLineEnd
-	writeStatus(freq,aosTimeCnv,losTimeCnv,str(losTime),str(recordTime).split(".")[0],satName,'RECORDING')
+	writeStatus(freq,aosTimeCnv,losTimeCnv,str(losTime),str(recordTime).split(".")[0],satName,maxElev,'RECORDING')
 
 ##
 ## Let's record
@@ -493,13 +533,13 @@ while True:
 
 ## DEBUG
 ##
-##	recordWAV(freq,fname,5,xfname)
+#	recordWAV(freq,fname,5,xfname)
 ##	recordDOP(freq,fname,recordTime,xfname)
 ##
 	print logLineStart+"Decoding data"+logLineEnd
 ####
 	if xfname in ('NOAA 15', 'NOAA 19', 'NOAA 18'):
-	    writeStatus(freq,aosTimeCnv,losTimeCnv,str(losTime),str(recordTime).split(".")[0],satName,'DECODING')
+	    writeStatus(freq,aosTimeCnv,losTimeCnv,str(losTime),str(recordTime).split(".")[0],satName,maxElev,'DECODING')
 	    decode(fname,aosTime,satName,maxElev) # make picture
 ###
 	print logLineStart+"Finished pass of "+bcolors.YELLOW+satName+bcolors.OKGREEN+" at "+bcolors.CYAN+losTimeCnv+bcolors.OKGREEN+". Sleeping for"+bcolors.CYAN+" 10"+bcolors.OKGREEN+" seconds"+logLineEnd
@@ -515,6 +555,7 @@ while True:
 ### Let's sleep and just wait..
 ###
 	print logLineStart+bcolors.ENDC+bcolors.WARNING+"Too low for good reception ("+bcolors.CYAN+str(minElev)+"°"+bcolors.WARNING+" > max: "+bcolors.CYAN+str(maxElev)+"°"+bcolors.WARNING+" elev. )\n\tSleeping for "+bcolors.CYAN+str(recordTime)+bcolors.WARNING+" seconds..."+logLineEnd
+	writeStatus(freq,aosTimeCnv,losTimeCnv,aosTime,recordTime,satName,maxElev,'TOOLOW')
 	time.sleep(recordTime)
 
 ## Main loop done
