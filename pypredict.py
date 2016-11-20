@@ -17,9 +17,12 @@ def aoslos(satname):
 	data = line.split()
 	if len(data)==12:  # expect 12 columns, pick out time, lat, lon
 	    result.extend([int(data[j]) for j in [4]])
-    maxElev=max(result)
+    if len(result)>1:
+	maxElev=max(result)
+    else:
+	maxElev=int('1')
     try:
-        aosTime=int(lines[0].split()[0])
+	aosTime=int(lines[0].split()[0])
         losTime=int(lines[-2].split()[0])
         if losTime>aosTime:
             return (aosTime,losTime,maxElev)
