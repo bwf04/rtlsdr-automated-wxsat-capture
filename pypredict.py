@@ -15,8 +15,10 @@ def aoslos(satname):
     result = []
     for line in lines:
 	data = line.split()
-	if len(data)==12:  # expect 12 columns, pick out time, lat, lon
+#	print data
+	if len(data)>10:  # Mhm. It's 11 or 12 columns... 
 	    result.extend([int(data[j]) for j in [4]])
+#    print result
     if len(result)>1:
 	maxElev=max(result)
     else:
