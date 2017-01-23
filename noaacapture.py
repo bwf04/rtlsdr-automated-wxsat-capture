@@ -18,10 +18,10 @@ import re
 satellites = ['NOAA 18','NOAA 15','NOAA 19']
 freqs = [137912500, 137620000, 137100000]
 # Dongle gain
-dongleGain='48.0'
+dongleGain='37.2'
 #
 # Dongle PPM shift, hopefully this will change to reflect different PPM on freq
-dongleShift='53'
+dongleShift='0'
 #
 # Dongle index, is there any rtl_fm allowing passing serial of dongle? Unused right now
 dongleIndex='0'
@@ -56,9 +56,9 @@ mapDir='/opt/wxsat/maps'
 # Create map overlay?
 wxAddOverlay='yes'
 # Image outputs
-wxEnhHVC='no'
-wxEnhHVCT='no'
-wxEnhMSA='no'
+wxEnhHVC='yes'
+wxEnhHVCT='yes'
+wxEnhMSA='yes'
 wxEnhMCIR='yes'
 # Other tunables
 # Turning it off creates empty logs...
@@ -338,7 +338,7 @@ def decode(fname,aosTime,satName,maxElev):
 	    print 'Creating HVC image'
 	    hvc_log = open(imgdir+'/'+satName+'/'+fileNameC+'-hvc-map.jpg.txt',"w+")
 	    hvc_log.write('\nHVC SAT: '+str(xfNoSpace)+', Elevation max: '+str(maxElev)+', Date: '+str(fname)+'\n')
-	    cmdline_hvc = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-K','-o','-R1','-Q '+wxJPEGQuality,'-e','HVC','-m',mapDir+'/'+fname+'-map.png,'+wxOverlayOffetX+','+wxOverlayOffsetY,recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvc-map.jpg']
+	    cmdline_hvc = [ wxInstallDir+'/wxtoimg',wxQuietOpt,wxDecodeOpt,wxAddText,'-K','-o','-R1','-Q '+wxJPEGQuality,'-e','HVC','-m',mapDir+'/'+fname+'-map.png,'+wxOverlayOffsetX+','+wxOverlayOffsetY,recdir+'/'+xfNoSpace+'-'+fname+'.wav', imgdir+'/'+satName+'/'+fileNameC+'-hvc-map.jpg']
 	    subprocess.call(cmdline_hvc, stderr=hvc_log, stdout=hvc_log)
 	    if LOG_SCP in ('yes', 'y', '1'):
 		print logLineStart+"Sending HVC flight and decode logs..."+bcolors.YELLOW
